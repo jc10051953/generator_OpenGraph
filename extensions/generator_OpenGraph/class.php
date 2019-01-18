@@ -7,11 +7,17 @@
 class Generator_OpenGraph {
 
     const FONT = EXTENSION_FOLDER_PATH.'/fonts/'.FONT_FAMILY;
+    const FONT_COMPANY = EXTENSION_FOLDER_PATH.'/fonts/'.FONT_FAMILY_COMPANY_NAME;
+
+    private $width_thumbnail = PICTURE_WIDTH;
+    private $height_thumbnail = PICTURE_HEIGHT;
 
     private static $instance = NULL;
 
     private function __construct(){}
     private function __clone(){}
+
+
 
 
     /**
@@ -27,19 +33,22 @@ class Generator_OpenGraph {
     private function createThumbnail($image, $new_image, $thumbnail, $type, $imageCreateFrom, $title) {
 
         if (!file_exists($new_image)) {
-            $this->resizeImage($image, $new_image, PICTURE_WIDTH, PICTURE_HEIGHT);
+
+            $this->resizeImage($image, $new_image, $this->width_thumbnail, $this->height_thumbnail);
+            $size=getimagesize($new_image);
+            $this->width_thumbnail = (int)$size[0];
+            $this->height_thumbnail = (int)$size[1];
         }
 
         $function_create = 'image' . $type;
 
         $image = $imageCreateFrom($new_image);
 
-        $background = @imagecreatetruecolor(PICTURE_WIDTH, PICTURE_HEIGHT) or die('Невозможно инициализировать GD поток');
+        $background = @imagecreatetruecolor($this->width_thumbnail, $this->height_thumbnail) or die('Невозможно инициализировать GD поток');
         $transparency = imagecolorallocatealpha($background, 0, 0, 0, PICTURE_BACKGROUND_TRANSPERENT);
         imagefill($background, 0, 0, $transparency);
         imagesavealpha($background, TRUE);
-        imagecopyresampled($image, $background, 0, 0, 0, 0, PICTURE_WIDTH, PICTURE_HEIGHT, imagesx($image), imagesy($image));
-
+        imagecopyresampled($image, $background, 0, 0, 0, 0, $this->width_thumbnail, $this->height_thumbnail, imagesx($image), imagesy($image));
 
         $this->drawTitle($image, $title);
         $this->drawNameCompany($image);
@@ -62,16 +71,15 @@ class Generator_OpenGraph {
      */
     private function drawNameCompany(&$img){
 
-        $box = imagettfbbox(FONT_SIZE_COMPANY_NAME, 0, self::FONT, COMPANY_NAME);
+        $box = imagettfbbox(FONT_SIZE_COMPANY_NAME, 0, self::FONT_COMPANY, COMPANY_NAME);
 
         $x = 20;
-        $y = PICTURE_HEIGHT-($box[3]-$box[5]);
-
+        $y = $this->height_thumbnail-($box[3]-$box[5]);
         list($r,$g,$b) = explode(',', FONT_COLOR_COMPANY_NAME);
 
         $color = imageColorAllocate($img, $r, $g, $b); //color
 
-        imagettftext($img, FONT_SIZE_COMPANY_NAME, 0, $x, $y, $color, self::FONT, COMPANY_NAME);
+        imagettftext($img, FONT_SIZE_COMPANY_NAME, 0, $x, $y, $color, self::FONT_COMPANY, COMPANY_NAME);
 
         return TRUE;
     }
@@ -86,13 +94,13 @@ class Generator_OpenGraph {
         $path_logo = $_SERVER['DOCUMENT_ROOT'].COMPANY_LOGO;
 
         $type = $this->getTypeImage($path_logo);
-        $imageCreateFrom = 'imageCreateFrom'.ucfirst($type);
+        $imageCreateFrom = 'imageCreateFrom'.$type;
 
         $name = basename($path_logo, '.' . $type);
         $path_folder_img = $_SERVER['DOCUMENT_ROOT'] . GENERAL_PATH_FOLDER_THUMBNAIL;
         $path_new_logo = $path_folder_img . $name  . '.' . $type;
         if(!file_exists($path_new_logo)) {
-            $max_h =  ceil(PICTURE_HEIGHT * .15);
+            $max_h =  ceil($this->height_thumbnail * .15);
             $this->resizeImage($path_logo, $path_new_logo, 0, $max_h);
         }
         $logo = $imageCreateFrom($path_new_logo);
@@ -100,8 +108,8 @@ class Generator_OpenGraph {
         $w=(int)$size[0];
         $h=(int)$size[1];
 
-        $x = PICTURE_WIDTH-$w-20;
-        $y = PICTURE_HEIGHT-$h - 20;
+        $x = $this->width_thumbnail-$w-20;
+        $y = $this->height_thumbnail-$h - 20;
 
         imagecopyresampled($img, $logo, $x, $y, 0, 0, $w, $h, $w, $h);
 
@@ -122,7 +130,7 @@ class Generator_OpenGraph {
 
         $padding = 20;
         $width_text = $box[2]+$box[0];
-        if($width_text > PICTURE_WIDTH - $padding) {
+        if($width_text > $this->width_thumbnail - $padding) {
             $s = substr_count($text,' ') / 2;
             $s = (int)$s;
             $offset = 0;
@@ -139,8 +147,8 @@ class Generator_OpenGraph {
         }
 
 
-        $x = (PICTURE_WIDTH/2)-($box[2]-$box[0])/2;
-        $y = (PICTURE_HEIGHT/2)-($box[3]-$box[5])/2;
+        $x = ($this->width_thumbnail/2)-($box[2]-$box[0])/2;
+        $y = ($this->height_thumbnail/2)-($box[3]-$box[5])/2;
 
         list($r,$g,$b) = explode(',', FONT_COLOR_TITLE);
 
@@ -274,14 +282,15 @@ class Generator_OpenGraph {
         $type = $this->getTypeImage($image);
         $imageCreateFrom = 'imageCreateFrom'.ucfirst($type);
         $name = basename($image, '.' . $type);
+
         $path_folder_img = $_SERVER['DOCUMENT_ROOT'] . GENERAL_PATH_FOLDER_THUMBNAIL;
-        $new_image = $path_folder_img . $name . PICTURE_WIDTH . 'x' . PICTURE_HEIGHT . '.' . $type;
-        $thumbnail = $path_folder_img . 'th_' . $name . PICTURE_WIDTH . 'x' . PICTURE_HEIGHT . 'x' . PICTURE_BACKGROUND_TRANSPERENT . '.' . $type;
+        $new_image = $path_folder_img . $name . '.' . $type;
+        $thumbnail = $path_folder_img . 'th_' . $name . '.' . $type;
 
         if(!file_exists($thumbnail)) {
             $this->createThumbnail($image, $new_image, $thumbnail,$type, $imageCreateFrom, $title);
         }
-        return GENERAL_PATH_FOLDER_THUMBNAIL .'th_' . $name . PICTURE_WIDTH . 'x' . PICTURE_HEIGHT . 'x' . PICTURE_BACKGROUND_TRANSPERENT . '.' . $type;
+        return GENERAL_PATH_FOLDER_THUMBNAIL .'th_' . $name . '.' . $type;
     }
 
 }
